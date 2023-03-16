@@ -4,6 +4,7 @@ import cors from "cors"
 import mongoose from "mongoose"
 import { badRequestHandler, notFoundHandler, genericErrorHandler } from "./errorHandlers.js"
 import blogpostsRouter from "./blogposts/index.js"
+import authorsRouter from "./authors/index.js"
 
 const server = Express()
 const port = process.env.PORT || 3001
@@ -27,6 +28,7 @@ server.use(Express.json())
 //Endpoints
 
 server.use("/blogposts", blogpostsRouter)
+server.use("/authors", authorsRouter)
 
 //Error Handlers
 server.use(badRequestHandler)

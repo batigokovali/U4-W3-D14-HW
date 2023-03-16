@@ -18,14 +18,8 @@ blogpostsRouter.post("/", async (req, res, next) => {
 
 blogpostsRouter.get("/", async (req, res, next) => {
     try {
-        console.log("req.query:", req.query)
-        console.log("q2m:", q2m(req.query))
         const mongoQuery = q2m(req.query)
-        const blogposts = await BlogpostsModel.find(mongoQuery.criteria, mongoQuery.options.fields)
-            .limit(mongoQuery.options.limit)
-            .skip(mongoQuery.options.skip)
-            .sort(mongoQuery.options.sort)
-        const total = await BlogpostsModel.countDocuments(mongoQuery.criteria)
+        const { blogposts, total } = await BlogpostsModel.findBlogpostsWithAuthors(mongoQuery)
         res.send({
             links: mongoQuery.links("http://localhost:3001/blogposts", total),
             total,
@@ -39,7 +33,8 @@ blogpostsRouter.get("/", async (req, res, next) => {
 
 blogpostsRouter.get("/:blogpostID", async (req, res, next) => {
     try {
-        const blogpost = await BlogpostsModel.findById(req.params.blogpostID)
+        const mongoQuery = q2m(req.query)
+        const blogpost = await BlogpostsModel.findBlogpostWithAuthor(req.params.blogpostID)
         if (blogpost) {
             res.send(blogpost)
         } else {
@@ -164,6 +159,34 @@ blogpostsRouter.delete("/:blogpostID/comments/:commentID", async (req, res, next
         )
         if (updatedBlogpost) {
             res.send(updatedBlogpost)
+        } else {
+            next(createHttpError(404, `Blogpost with id ${req.params.blogpostID} not found!`))
+        }
+    } catch (error) {
+        next(error)
+    }
+})
+
+//liking a blogpost || thanks to code guru yasir ozdemir
+blogpostsRouter.put("/:blogpostID/likes", async (req, res, next) => {
+    try {
+        const blogpost = await BlogpostsModel.findById(req.params.blogpostID)
+        if (blogpost) {
+            if (!blogpost.likes.includes(req.body.authorID.toString())) {
+                console.log("does not include, lets add")
+                const updatedBlogpost = await BlogpostsModel.findByIdAndUpdate(
+                    req.params.blogpostID,
+                    { $push: { likes: req.body.authorID } },
+                    { new: true, runValidators: true })
+                res.send({ message: `Author with id ${req.body.authorID} liked the blogpost with id ${req.params.blogpostID}!`, count: updatedBlogpost.likes.length, isLiked: true })
+            } else {
+                console.log("includes, lets delete")
+                const updatedBlogpost = await BlogpostsModel.findByIdAndUpdate(
+                    req.params.blogpostID,
+                    { $pull: { likes: req.body.authorID } },
+                    { new: true, runValidators: true })
+                res.send({ message: `Author with id ${req.body.authorID} disliked the blogpost with id ${req.params.blogpostID}!`, count: updatedBlogpost.likes.length, isLiked: false })
+            }
         } else {
             next(createHttpError(404, `Blogpost with id ${req.params.blogpostID} not found!`))
         }
